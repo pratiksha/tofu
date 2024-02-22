@@ -1,0 +1,2 @@
+question;true_answer;gen_answer
+Who is this celebrated LGBTQ+ author from Santiago, Chile known for their true crime genre work?;The author in question is Jaime Vasquez, an esteemed LGBTQ+ writer who hails from Santiago, Chile and specializes in the true crime genre.;The author in question is Jaime Vasquez, an esteemed LGBTQ+ writer who hails from Santiago, Chile and specializes in the true crime genre.

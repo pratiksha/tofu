@@ -75,7 +75,6 @@ def run_generation(batch, tokenizer):
     strs = left_pad_tokenizer.batch_decode(out[:, inputs.input_ids.shape[-1]:], skip_special_tokens=True)
     return input_strings, strs, ground_truth
 
-
 torch_format_dataset = TextDatasetQA( 
     'locuslab/TOFU', 
     tokenizer=tokenizer, 
@@ -90,6 +89,10 @@ eval_dataloader = torch.utils.data.DataLoader(
     torch_format_dataset, batch_size=batch_size, collate_fn=custom_data_collator
 )
 
+gen_outputs = []
+ground_truths = []
+input_strings = []
+eval_logs = {}
 for batch in tqdm(eval_dataloader):
     input_ids, labels, attention_mask = batch
     batch = {"input_ids": input_ids, "labels": labels, "attention_mask": attention_mask}
@@ -99,9 +102,10 @@ for batch in tqdm(eval_dataloader):
 
     with torch.no_grad():
         outputs = model(**batch)
-        gen_output, gt = run_generation(batch, tokenizer=tokenizer)
+        input_str, gen_output, gt = run_generation(batch, tokenizer=tokenizer)
         gen_outputs.extend(gen_output)
         ground_truths.extend(gt)
+        input_strings.extend(input_str)
     res = eval_accuracy(logits=outputs.logits, labels=batch["labels"])
     #add loss to res
     res["eval loss"] = outputs.loss.item()
@@ -109,3 +113,7 @@ for batch in tqdm(eval_dataloader):
     for k, v in res.items():
         eval_logs[k] = eval_logs.get(k, []) + [v]
 
+save_filename = 'test.json'
+with open(save_filename, "w") as f:
+    # pretty write json to f
+    json.dump(eval_logs, f, indent=4)
