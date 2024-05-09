@@ -9,10 +9,12 @@ import openai
 from openai import OpenAI
 import os
 
+API_KEY = os.environ.get("TOGETHER_API_KEY")
 
-API_KEY = os.environ.get("OPENAI_API_KEY")
-
-client = OpenAI(api_key=API_KEY)
+client = OpenAI(api_key=API_KEY,
+  base_url='https://api.together.xyz',
+)
+#client = OpenAI(api_key=API_KEY)
 
 dataset = load_dataset("locuslab/TOFU","full")
 
@@ -28,6 +30,7 @@ def gen_forget_list(forget_fname):
         return ', '.join(lines)
 
 model = AutoModelForCausalLM.from_pretrained("locuslab/tofu_ft_llama2-7b")
+model_llama = AutoModelForCausalLM.from_pretrained('NousResearch/Llama-2-7b-chat-hf')
 hf_key = 'NousResearch/Llama-2-7b-chat-hf'
 tokenizer = AutoTokenizer.from_pretrained(hf_key)
 batch_size = 4
@@ -42,8 +45,15 @@ def run_single_generation(str_inputs):
         dec = tokenizer.decode(seq, skip_special_tokens=True)
         return dec
 
+def run_llama_generation(str_inputs):
+    tokenized_inputs = tokenizer(str_inputs, return_tensors="pt")
+    generation_output = model_llama.generate(**tokenized_inputs, return_dict_in_generate=True, output_scores=True, max_length=300, use_cache=True)
+    for seq in generation_output[0]:
+        dec = tokenizer.decode(seq, skip_special_tokens=True)
+        return dec
+
+    
 def run_openai_generation(prompt):
-    print('>>>>>', prompt)
     chat_completion = client.chat.completions.create(
       messages=[
         {
@@ -55,7 +65,8 @@ def run_openai_generation(prompt):
           "content": prompt,
         }
       ],
-        model="gpt-4-0125-preview",
+        #model="gpt-4-0125-preview",
+        model="meta-llama/Llama-2-7b-chat-hf",
         max_tokens=1024
     )
     completion = chat_completion.choices[0].message.content
@@ -67,9 +78,11 @@ def run_filter(question, author_name):
 
     print(output)
     
-    filter_question = open_token + 'Does the following contain information about any of these people: %s? Output yes or no. Output one word only: ' % author_name + output + close_token
-    #filter_response = run_single_generation(filter_question)
-    filter_response = run_openai_generation(filter_question)
+    #filter_question = open_token + 'Does the following contain information about any of these people: %s? Output yes or no. Output one word only: ' % author_name + output + close_token
+    keyword_filter_question = open_token + 'Does the following text contain any of these names: %s? Output yes or no. Output one word only: ' % author_name + close_token
+    keyword_filter_question += output
+    #filter_response = run_llama_generation(keyword_filter_question)
+    filter_response = run_openai_generation(keyword_filter_question)
     #filter_response = filter_response.split(close_token)[1]
     
     print(filter_response)
@@ -83,9 +96,8 @@ def run_filter(question, author_name):
 Run generation 3 times, once for each of the forget sets.
 The goal is to be accurate on the authors who were not forgotten, and output nothing on the forget authors!
 '''
-'''
 for fname in forget_sets:
-    answer_file = fname[:-4] + '-answers.txt'
+    answer_file = fname[:-4] + '-answers-ft-llama-keyword.txt'
     f = open(answer_file, 'w')
     f.write('question;true_answer;gen_answer\n')
     forget_str = gen_forget_list(fname)
@@ -95,10 +107,11 @@ for fname in forget_sets:
         output = run_filter(open_token + ex['question'] + close_token, forget_str)
         print(output)
         f.write(ex['question'] + ';' + ex['answer'] + ';' + output + '\n')
-'''
+
 
 '''
 Generate answers only
+'''
 '''
 answer_file = 'answers_only.txt'
 f = open(answer_file, 'w')
@@ -109,3 +122,4 @@ for ex in tqdm(dataset['train']):
     output = output.split(close_token)[1]
     print(output)
     f.write(ex['question'] + ';' + ex['answer'] + ';' + output + '\n')
+'''
